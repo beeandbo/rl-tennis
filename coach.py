@@ -44,7 +44,7 @@ class Coach():
                 break
             states = next_states
         self.agent.end_episode()
-        return scores.min()
+        return scores.max()
 
     def diagnostic(self, episode, scores, average_scores_over):
         """

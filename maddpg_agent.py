@@ -9,14 +9,14 @@ import torch.nn.functional as F
 from ornstein_uhlenbeck_process import OrnsteinUhlenbeckProcess
 
 # Size of the replay buffer storing past experiences for training
-REPLAY_BUFFER_SIZE = 10**6
+REPLAY_BUFFER_SIZE = 1e6
 
 # Number of experiences to use per training minibatch
 BATCH_SIZE = 1024
 
 # Number of steps taken between each round of training.  Each agent
 # action is considered a step (so 20 simultaneous agents acting mean 20 steps)
-STEPS_BETWEEN_TRAINING = 20
+STEPS_BETWEEN_TRAINING = 4
 
 # Reward decay
 GAMMA = 0.95
@@ -76,13 +76,15 @@ class MADDPGAgent():
             actor = ActorNetwork(state_size, action_size)
             self.actors.append(actor)
             self.actor_targets.append(ActorNetwork(state_size, action_size))
+            self.soft_update(self.actor_targets[-1].parameters(), actor.parameters(), 1)
             self.actor_optimizers.append(optim.Adam(actor.parameters(), lr=ACTOR_LEARNING_RATE))
 
             # Critic
             # Note: we use action_size * num_agents since we'll pass in the actions of all agents concatenated
-            critic = CriticNetwork(state_size, action_size * num_agents)
+            critic = CriticNetwork(state_size * num_agents, action_size * num_agents)
             self.critics.append(critic)
-            self.critic_targets.append(CriticNetwork(state_size, action_size * num_agents))
+            self.critic_targets.append(CriticNetwork(state_size * num_agents, action_size * num_agents))
+            self.soft_update(self.critic_targets[-1].parameters(), critic.parameters(), 1)
             self.critic_optimizers.append(optim.Adam(critic.parameters(), lr=CRITIC_LEARNING_RATE, weight_decay=CRITIC_WEIGHT_DECAY))
 
         self.replay_buffer = ReplayBuffer(action_size, REPLAY_BUFFER_SIZE, None)
@@ -116,34 +118,31 @@ class MADDPGAgent():
                 actions = actions + self.random_process.sample()
             actions = np.clip(actions, -1, 1)
             all_actions.append(actions)
-        print(all_actions)
         return np.vstack(all_actions)
 
     def predict_and_vectorize_actions(self, experiences, agent_index):
-        vectors = []
-        for experience in experiences:
-            actions = []
-            for i in range(self.num_agents):
-                if i == agent_index:
-                    actor = self.actors[agent_index]
-                    state = torch.tensor(experience.states[agent_index], dtype=torch.float32)
-                    actions.append(actor(state).unsqueeze(0))
-                else:
-                    actions.append(torch.from_numpy(experience.actions[i]).float().unsqueeze(0))
-            vectors.append(torch.cat(actions, dim=1))
-        return torch.cat(vectors, dim=0)
+        actions = []
+        for i in range(self.num_agents):
+            if i == agent_index:
+                actor = self.actors[agent_index]
+                states = torch.from_numpy(np.vstack([e.states[i] for e in experiences if e is not None])).float().to(self.device)
+                actions.append(actor(states))
+            else:
+                actions.append(torch.from_numpy(np.vstack([e.actions[i] for e in experiences if e is not None])).float().to(self.device))
+        return torch.cat(actions, dim=1)
 
     def predict_and_vectorize_next_actions(self, experiences):
-        vectors = []
-        for exprience in experiences:
-            actions = []
-            for state, actor in zip(exprience.next_states, self.actor_targets):
-                    actions.append(actor(torch.tensor(state, dtype=torch.float32).unsqueeze(0)).detach())
-            vectors.append(torch.cat(actions, dim=1))
-        return torch.cat(vectors)
+        next_actions = []
+        for i in range(self.num_agents):
+            next_states = torch.from_numpy(np.vstack([e.next_states[i] for e in experiences if e is not None])).float().to(self.device)
+            next_actions.append(self.actor_targets[i](next_states).detach())
+        return torch.cat(next_actions, dim=1)
 
-    def vectorize_actions(self, experiences):
-        return torch.from_numpy(np.vstack([np.concatenate(e.actions) for e in experiences if e is not None])).float().to(self.device)
+    def vectorize_actions_and_states(self, experiences):
+        actions = torch.from_numpy(np.vstack([np.concatenate(e.actions) for e in experiences if e is not None])).float().to(self.device)
+        full_states = torch.from_numpy(np.vstack([np.concatenate(e.states) for e in experiences if e is not None])).float().to(self.device)
+        full_next_states = torch.from_numpy(np.vstack([np.concatenate(e.next_states) for e in experiences if e is not None])).float().to(self.device)
+        return (actions, full_states, full_next_states)
 
     def vectorize_per_agent_data(self, experiences, agent_index):
         states = torch.from_numpy(np.vstack([e.states[agent_index] for e in experiences if e is not None])).float().to(self.device)
@@ -167,14 +166,14 @@ class MADDPGAgent():
         mean = to_normalize.mean(0)
         return (to_normalize - mean)/(std + 1e-5)
 
-    def soft_update(self, target_parameters, local_parameters):
+    def soft_update(self, target_parameters, local_parameters, tau = TAU):
         """
         Updates the given target network parameters with the local parameters
         using a soft update strategy: tau * local + (1-tau) * target
         """
 
         for target, local in zip(target_parameters, local_parameters):
-            target.data.copy_(TAU*local.data + (1.0-TAU)*target.data)
+            target.data.copy_(tau*local.data + (1.0-tau)*target.data)
 
     def train(self, experiences):
         """
@@ -187,7 +186,7 @@ class MADDPGAgent():
 
         # Transform agent indendent data into vectorized tensors
         next_actions = self.predict_and_vectorize_next_actions(experiences)
-        actions = self.vectorize_actions(experiences)
+        actions, full_states, full_next_states = self.vectorize_actions_and_states(experiences)
 
         # Iterate through each agent
         for i in range(self.num_agents):
@@ -196,7 +195,7 @@ class MADDPGAgent():
             states, rewards, next_states, dones = self.vectorize_per_agent_data(experiences, i)
             rewards = self.normalize(rewards)
 
-            # Grab networks this agent offset
+            # Grab networks for this agent offset
             critic = self.critics[i]
             critic_target = self.critic_targets[i]
             critic_optimizer = self.critic_optimizers[i]
@@ -205,10 +204,10 @@ class MADDPGAgent():
             actor_optimizer = self.actor_optimizers[i]
 
             # Use the target critic network to calculate a target q value\
-            q_target = rewards + GAMMA * critic_target(next_states, next_actions) * (1-dones)
+            q_target = rewards + GAMMA * critic_target(full_next_states, next_actions) * (1-dones)
 
             # Calculate the predicted q value
-            q_predicted = critic(states, actions)
+            q_predicted = critic(full_states, actions)
 
             # Update critic network
             critic_loss = F.mse_loss(q_predicted, q_target)
@@ -219,10 +218,12 @@ class MADDPGAgent():
 
             # Update predicted action using policy gradient
             actions_predicted = self.predict_and_vectorize_actions(experiences, i)
-            policy_loss = -critic(states, actions_predicted).mean()
+            policy_loss = -critic(full_states, actions_predicted).mean()
             actor_optimizer.zero_grad()
             policy_loss.backward()
             actor_optimizer.step()
+            if i == 0:
+                print(policy_loss)
 
             # Soft update target networks
             self.soft_update(actor_target.parameters(), actor.parameters())
