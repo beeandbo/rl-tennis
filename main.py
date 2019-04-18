@@ -9,6 +9,7 @@ Example: pythonw main.py --episodes 200 --max-steps 1000 --saveto checkpoint.pth
 
 from unityagents import UnityEnvironment
 import ddpg_agent
+import maddpg_agent
 import coach
 import matplotlib.pyplot as plt
 import argparse
@@ -31,14 +32,14 @@ def moving_average(input, average_over):
     return output
 
 def main():
-    parser = argparse.ArgumentParser(description='Train a ddpg agent to play the Unity Environment Reacher app')
-    parser.add_argument("--episodes", type=int, help="Number of training episodes to run", default=200)
+    parser = argparse.ArgumentParser(description='Train a ddpg agent to play the Unity Environment Tennis app')
+    parser.add_argument("--episodes", type=int, help="Number of training episodes to run", default=20000)
     parser.add_argument("--max_steps", type=int, help="Maximum steps per episode", default=1000)
     parser.add_argument("--saveto", help="Save agent after training.  agent- and critic- are prepended to the specified name.", default='checkpoint.pth')
     parser.add_argument("--loadfrom", help="Load previously saved model before training")
     parser.add_argument("--min_score", type=float, help="Only save the model if the it achieves this score", default=30.)
     parser.add_argument("--saveplot", help="Location to save plot of scores")
-    parser.add_argument("--environment", help="Path to Unity environment for game (i.e. ./Reacher.App)", default="./Reacher.app")
+    parser.add_argument("--environment", help="Path to Unity environment for game (i.e. ./Reacher.App)", default="./Tennis.app")
     parser.add_argument("--eval", type=bool, help="Turns on eval mode, which affects the unity environment and removes the random noise from the predicted agent actions", default=False)
     args = parser.parse_args()
 
@@ -51,6 +52,7 @@ def main():
 
     # number of actions
     action_size = brain.vector_action_space_size
+    print("Action size: " + str(action_size))
 
     # examine the state space
     state = env_info.vector_observations[0]
@@ -60,7 +62,7 @@ def main():
     print('Number of agents:', num_agents)
 
     # Create agent and start training
-    _agent = ddpg_agent.DDPGAgent(state_size, action_size, num_agents)
+    _agent = maddpg_agent.MADDPGAgent(state_size, action_size, num_agents)
     if args.loadfrom:
         _agent.load(args.loadfrom)
     _coach = coach.Coach(_agent, env)

@@ -21,9 +21,10 @@ class ActorNetwork(nn.Module):
         self.output_layer.weight.data.uniform_(-3e-3, 3e-3)
 
     def forward(self, states):
-        x = self.input_norm(states)
+        x = states
+        #x = self.input_norm(x)
         x = functional.relu(self.fc1(x))
-        x = self.fc1_norm(x)
+        #x = self.fc1_norm(x)
         x = functional.relu(self.fc2(x))
-        x = self.fc2_norm(x)
+        #x = self.fc2_norm(x)
         return functional.tanh(self.output_layer(x))

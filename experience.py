@@ -1,3 +1,3 @@
 from collections import namedtuple
 
-Experience = namedtuple('Experience', ['state', 'action', 'reward', 'next_state', 'done'])
+Experience = namedtuple('Experience', ['states', 'actions', 'rewards', 'next_states', 'dones'])

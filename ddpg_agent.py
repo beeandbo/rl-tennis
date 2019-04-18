@@ -12,14 +12,14 @@ from ornstein_uhlenbeck_process import OrnsteinUhlenbeckProcess
 REPLAY_BUFFER_SIZE = 10**6
 
 # Number of experiences to use per training minibatch
-BATCH_SIZE = 128
+BATCH_SIZE = 256
 
 # Number of steps taken between each round of training.  Each agent
 # action is considered a step (so 20 simultaneous agents acting mean 20 steps)
-STEPS_BETWEEN_TRAINING = 10 * 20 # 20 agents for 20 steps
+STEPS_BETWEEN_TRAINING = 2 * 4 # 2 agents for 4 steps
 
 # Perform training this many times per rouund
-ITERATIONS_PER_TRAINING = 10
+ITERATIONS_PER_TRAINING = 1
 
 # Reward decay
 GAMMA = 0.99
@@ -92,6 +92,8 @@ class DDPGAgent():
         noise (boolean): Add random noise to the predicted action.  Aids
             exploration of the environment during training.
         """
+        #print("states")
+        #print(states)
 
         self.local_actor_network.eval()
         with torch.no_grad():
@@ -100,6 +102,8 @@ class DDPGAgent():
         if noise:
             actions = actions + self.random_process.sample()
         actions = np.clip(actions, -1, 1)
+        #print("actions")
+        #print(actions)
         return actions
 
     def vectorize_experiences(self, experiences):

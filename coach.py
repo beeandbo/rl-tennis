@@ -20,16 +20,6 @@ class Coach():
         self.brain_name = env.brain_names[0]
         self.brain = env.brains[self.brain_name]
 
-    def to_experiences(self, states, actions, rewards, next_states, dones):
-        """
-        Turns vectors representing components of multiple experiences into a
-        vector of Experience objects.
-        """
-        experiences = []
-        for (state, action, reward, next_state, done) in zip(states, actions, rewards, next_states, dones):
-            experiences.append(Experience(state, action, reward, next_state, done))
-        return experiences
-
     def run_episode(self, max_steps, train = True):
         """
         Executes a single episode.
@@ -49,14 +39,12 @@ class Coach():
             rewards = env_info.rewards
             dones = env_info.local_done
             scores += rewards
-            for experience in self.to_experiences(states, actions, rewards, next_states, dones):
-                self.agent.learn(experience)
+            self.agent.learn(Experience(states, actions, rewards, next_states, dones))
             if dones[0]:
                 break
             states = next_states
-
         self.agent.end_episode()
-        return scores.mean()
+        return scores.min()
 
     def diagnostic(self, episode, scores, average_scores_over):
         """
@@ -72,7 +60,7 @@ class Coach():
         score_window = scores[-average_scores_over:]
         mean_score = np.mean(score_window)
         max_score = np.max(score_window)
-        if (episode + 1) % 10 == 0:
+        if (episode + 1) % average_scores_over == 0:
             end = "\n"
         else:
             end = ""
@@ -90,7 +78,8 @@ class Coach():
         """
 
         scores = []
+        print(num_episodes)
         for i in range(num_episodes):
             scores.append(self.run_episode(max_steps, train))
-            self.diagnostic(i, scores, 20)
+            self.diagnostic(i, scores, 100)
         return scores
