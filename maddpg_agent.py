@@ -9,7 +9,7 @@ import torch.nn.functional as F
 from ornstein_uhlenbeck_process import OrnsteinUhlenbeckProcess
 
 # Size of the replay buffer storing past experiences for training
-REPLAY_BUFFER_SIZE = 1e6
+REPLAY_BUFFER_SIZE = 10**6
 
 # Number of experiences to use per training minibatch
 BATCH_SIZE = 1024
@@ -222,8 +222,6 @@ class MADDPGAgent():
             actor_optimizer.zero_grad()
             policy_loss.backward()
             actor_optimizer.step()
-            if i == 0:
-                print(policy_loss)
 
             # Soft update target networks
             self.soft_update(actor_target.parameters(), actor.parameters())

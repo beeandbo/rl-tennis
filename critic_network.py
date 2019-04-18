@@ -3,6 +3,9 @@ import torch.nn as nn
 import torch.nn.functional as functional
 import network
 
+HIDDEN_LAYER_1 = 400
+HIDDEL_LAYER_2 = 300
+
 class CriticNetwork(nn.Module):
     """
     Fully connected network for critic.  Takes in states and actions and
@@ -10,9 +13,9 @@ class CriticNetwork(nn.Module):
     """
     def __init__(self, state_dim, action_dim):
         super(CriticNetwork, self).__init__()
-        self.fc1 = nn.Linear(state_dim, 400)
-        self.fc2 = nn.Linear(400 + action_dim, 300)
-        self.output_layer = nn.Linear(300, 1)
+        self.fc1 = nn.Linear(state_dim, HIDDEN_LAYER_1)
+        self.fc2 = nn.Linear(HIDDEN_LAYER_1 + action_dim, HIDDEL_LAYER_2)
+        self.output_layer = nn.Linear(HIDDEL_LAYER_2, 1)
 
         network.hidden_layer_init(self.fc1)
         network.hidden_layer_init(self.fc2)
