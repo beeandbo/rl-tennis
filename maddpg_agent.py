@@ -114,7 +114,7 @@ class MADDPGAgent():
                 actions = actor(torch.tensor(state, dtype=torch.float32).unsqueeze(0)).detach().numpy()
             actor.train()
             if noise:
-                actions = actions + self.random_process.sample() * self.noise_scaling
+                actions = actions + self.random_process.sample()
             actions = np.clip(actions, -1, 1)
             all_actions.append(actions)
         return np.vstack(all_actions)
@@ -269,4 +269,3 @@ class MADDPGAgent():
         Tell the agent that an episode is complete.
         """
         self.random_process.reset()
-        self.noise_scaling *= self.noise_scale_decay
