@@ -3,8 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as functional
 import network
 
-HIDDEN_LAYER_1 = 400
-HIDDEL_LAYER_2 = 300
+HIDDEN_LAYER_1 = 64
+HIDDEL_LAYER_2 = 64
 
 class CriticNetwork(nn.Module):
     """

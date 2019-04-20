@@ -12,11 +12,11 @@ from ornstein_uhlenbeck_process import OrnsteinUhlenbeckProcess
 REPLAY_BUFFER_SIZE = 10**6
 
 # Number of experiences to use per training minibatch
-BATCH_SIZE = 1024
+BATCH_SIZE = 256
 
 # Number of steps taken between each round of training.  Each agent
 # action is considered a step (so 20 simultaneous agents acting mean 20 steps)
-STEPS_BETWEEN_TRAINING = 4
+STEPS_BETWEEN_TRAINING = 1
 
 # Reward decay
 GAMMA = 0.95
@@ -213,7 +213,7 @@ class MADDPGAgent():
             critic_loss = F.mse_loss(q_predicted, q_target)
             critic_optimizer.zero_grad()
             critic_loss.backward()
-            torch.nn.utils.clip_grad_norm_(critic.parameters(), 1)
+            #torch.nn.utils.clip_grad_norm_(critic.parameters(), 1)
             critic_optimizer.step()
 
             # Update predicted action using policy gradient
@@ -270,4 +270,3 @@ class MADDPGAgent():
         Tell the agent that an episode is complete.
         """
         self.random_process.reset()
-        self.steps = 0
