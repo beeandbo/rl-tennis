@@ -61,10 +61,10 @@ class Coach():
         mean_score = np.mean(score_window)
         max_score = np.max(score_window)
         if (episode + 1) % average_scores_over == 0:
-            end = "\n"
+            end = "\r\n"
         else:
-            end = ""
-        print("\rEpisode: {}, Mean: {}, Max: {}, Last: {}".format(episode, mean_score, max_score, scores[-1]), end=end)
+            end = "\r"
+        print("Episode: {}, Mean: {}, Max: {}, Last: {}".format(episode, mean_score, max_score, scores[-1]), end=end)
 
 
     def run_episodes(self, num_episodes, max_steps, train = True):
