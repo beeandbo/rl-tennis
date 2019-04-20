@@ -16,7 +16,7 @@ BATCH_SIZE = 256
 
 # Number of steps taken between each round of training.  Each agent
 # action is considered a step (so 20 simultaneous agents acting mean 20 steps)
-STEPS_BETWEEN_TRAINING = 1
+STEPS_BETWEEN_TRAINING = 4
 
 # Reward decay
 GAMMA = 0.95
@@ -58,26 +58,24 @@ class MADDPGAgent():
         num_agents (integer): Number of simultaneous agents in the environment
         """
 
+        self.noise_scaling = 2.0
+        self.noise_scale_decay = 0.999
+
+
         self.state_size = state_size
         self.action_size = action_size
         self.num_agents = num_agents
 
         # Actor
-        self.actors = []
-        self.actor_targets = []
-        self.actor_optimizers = []
+        self.actor = ActorNetwork(state_size, action_size)
+        self.actor_target = ActorNetwork(state_size, action_size)
+        self.soft_update(self.actor_target.parameters(), self.actor.parameters(), 1)
+        self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=ACTOR_LEARNING_RATE)
 
         self.critics = []
         self.critic_targets = []
         self.critic_optimizers = []
         for i in range(num_agents):
-
-            # Actor
-            actor = ActorNetwork(state_size, action_size)
-            self.actors.append(actor)
-            self.actor_targets.append(ActorNetwork(state_size, action_size))
-            self.soft_update(self.actor_targets[-1].parameters(), actor.parameters(), 1)
-            self.actor_optimizers.append(optim.Adam(actor.parameters(), lr=ACTOR_LEARNING_RATE))
 
             # Critic
             # Note: we use action_size * num_agents since we'll pass in the actions of all agents concatenated
@@ -109,13 +107,14 @@ class MADDPGAgent():
         all_actions = []
 
         # Generate actions for each 'agent'
-        for state, actor in zip(all_states, self.actors):
+        for state in all_states:
+            actor = self.actor
             actor.eval()
             with torch.no_grad():
                 actions = actor(torch.tensor(state, dtype=torch.float32).unsqueeze(0)).detach().numpy()
             actor.train()
             if noise:
-                actions = actions + self.random_process.sample()
+                actions = actions + self.random_process.sample() * self.noise_scaling
             actions = np.clip(actions, -1, 1)
             all_actions.append(actions)
         return np.vstack(all_actions)
@@ -124,7 +123,7 @@ class MADDPGAgent():
         actions = []
         for i in range(self.num_agents):
             if i == agent_index:
-                actor = self.actors[agent_index]
+                actor = self.actor
                 states = torch.from_numpy(np.vstack([e.states[i] for e in experiences if e is not None])).float().to(self.device)
                 actions.append(actor(states))
             else:
@@ -135,7 +134,7 @@ class MADDPGAgent():
         next_actions = []
         for i in range(self.num_agents):
             next_states = torch.from_numpy(np.vstack([e.next_states[i] for e in experiences if e is not None])).float().to(self.device)
-            next_actions.append(self.actor_targets[i](next_states).detach())
+            next_actions.append(self.actor_target(next_states).detach())
         return torch.cat(next_actions, dim=1)
 
     def vectorize_actions_and_states(self, experiences):
@@ -199,9 +198,9 @@ class MADDPGAgent():
             critic = self.critics[i]
             critic_target = self.critic_targets[i]
             critic_optimizer = self.critic_optimizers[i]
-            actor = self.actors[i]
-            actor_target = self.actor_targets[i]
-            actor_optimizer = self.actor_optimizers[i]
+            actor = self.actor
+            actor_target = self.actor_target
+            actor_optimizer = self.actor_optimizer
 
             # Use the target critic network to calculate a target q value\
             q_target = rewards + GAMMA * critic_target(full_next_states, next_actions) * (1-dones)
@@ -270,3 +269,4 @@ class MADDPGAgent():
         Tell the agent that an episode is complete.
         """
         self.random_process.reset()
+        self.noise_scaling *= self.noise_scale_decay
