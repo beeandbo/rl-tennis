@@ -1,10 +1,9 @@
 """
-Program for training and evaling an DDPG agent that controls double articulated
-arms in the Unity "Reacher" environment.
+Program for training and evaling an Multi Agent DDPG within a Unity Tennis environment.
 
 You can tweak hyperparameters, control the number of episodes, etc.
 
-Example: pythonw main.py --episodes 200 --max-steps 1000 --saveto checkpoint.pth --saveplot scores.png
+Example: pythonw main.py --episodes 5000 --saveto checkpoint.pth --saveplot scores.png
 """
 
 from unityagents import UnityEnvironment
@@ -33,13 +32,13 @@ def moving_average(input, average_over):
 
 def main():
     parser = argparse.ArgumentParser(description='Train a ddpg agent to play the Unity Environment Tennis app')
-    parser.add_argument("--episodes", type=int, help="Number of training episodes to run", default=20000)
+    parser.add_argument("--episodes", type=int, help="Number of training episodes to run", default=5000)
     parser.add_argument("--max_steps", type=int, help="Maximum steps per episode", default=1000)
     parser.add_argument("--saveto", help="Save agent after training.  agent- and critic- are prepended to the specified name.", default='checkpoint.pth')
     parser.add_argument("--loadfrom", help="Load previously saved model before training")
-    parser.add_argument("--min_score", type=float, help="Only save the model if the it achieves this score", default=30.)
+    parser.add_argument("--min_score", type=float, help="Only save the model if the it achieves this score", default=0.5)
     parser.add_argument("--saveplot", help="Location to save plot of scores")
-    parser.add_argument("--environment", help="Path to Unity environment for game (i.e. ./Reacher.App)", default="./Tennis.app")
+    parser.add_argument("--environment", help="Path to Unity environment for game (i.e. ./Tennis.App)", default="./Tennis.app")
     parser.add_argument("--eval", type=bool, help="Turns on eval mode, which affects the unity environment and removes the random noise from the predicted agent actions", default=False)
     args = parser.parse_args()
 
@@ -66,13 +65,19 @@ def main():
     if args.loadfrom:
         _agent.load(args.loadfrom)
     _coach = coach.Coach(_agent, env)
-    scores = _coach.run_episodes(args.episodes, args.max_steps, train=not args.eval)
-    mean_score = np.mean(scores[-100:])
 
-    # Save the network if successful
-    if mean_score > args.min_score and args.saveto:
-        _agent.save(args.saveto)
-        print("Training succeeded!")
+    # Callback function which will save the agent if it exceeds the
+    # minimum score
+    max_score = 0
+    def save_fn(agent, episode, avg_score):
+        nonlocal max_score
+        if avg_score > max_score and avg_score > args.min_score and args.saveto:
+            agent.save(args.saveto)
+            print("Training succeeded.  New max score %s at step %s" % (avg_score, episode))
+            max_score = avg_score
+
+    # Train (or eval) the agent
+    scores = _coach.run_episodes(args.episodes, args.max_steps, train=not args.eval, callback = save_fn )
 
     # Plot scores
     plt.plot(scores)
@@ -80,7 +85,5 @@ def main():
     plt.ylabel('Episode scores')
     if args.saveplot:
         plt.savefig(args.saveplot, bbox_inches='tight')
-
-    print("Your agent received a final mean score of {}".format(mean_score))
 
 main()

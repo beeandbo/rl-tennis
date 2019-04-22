@@ -67,7 +67,7 @@ class Coach():
         print("Episode: {}, Mean: {}, Max: {}, Last: {}".format(episode, mean_score, max_score, scores[-1]), end=end)
 
 
-    def run_episodes(self, num_episodes, max_steps, train = True):
+    def run_episodes(self, num_episodes, max_steps, callback = None, train = True):
         """
         Run a series of episodes.
 
@@ -82,4 +82,8 @@ class Coach():
         for i in range(num_episodes):
             scores.append(self.run_episode(max_steps, train))
             self.diagnostic(i, scores, 100)
+            if callback and (i + 1) % 100:
+                callback(self.agent, i, np.mean(scores[-100:]))
+        if callback:
+            callback(self.agent, i, np.mean(scores[-100:]))
         return scores
