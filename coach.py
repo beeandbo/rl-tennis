@@ -11,7 +11,7 @@ class Coach():
 
         Params
         ======
-        agent (DDPGAgent): Agent under training
+        agent (MADDPGAgent): Agent under training
         env (Unity environment): Environment agent is acting within
         """
 
@@ -27,6 +27,8 @@ class Coach():
         Params
         ======
         max_steps (integer): The maximum time steps to run in a single episode.
+        train (Boolean): If true, run episode in train mode.  If false, run in
+            eval mode.
         """
 
         env_info = self.env.reset(train_mode=train)[self.brain_name]
@@ -75,6 +77,10 @@ class Coach():
         ======
         num_episodes (integer): Number of episodes to run
         max_steps (integer): Max steps per episode
+        callback (Function taking an agent, episode number, and average score):
+            Callback that invoked every one hundred episodes.  Useful
+            for saving the model once it passes a score threshold.
+        train (Boolean): If true, run episodes in train mode.
         """
 
         scores = []

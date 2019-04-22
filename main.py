@@ -7,7 +7,6 @@ Example: pythonw main.py --episodes 5000 --saveto checkpoint.pth --saveplot scor
 """
 
 from unityagents import UnityEnvironment
-import ddpg_agent
 import maddpg_agent
 import coach
 import matplotlib.pyplot as plt

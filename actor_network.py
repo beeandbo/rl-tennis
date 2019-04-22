@@ -7,7 +7,7 @@ HIDDEL_LAYER_2 = 64
 
 class ActorNetwork(nn.Module):
     """
-    The Actor network used by the DDPG agent.  It takes states as input
+    The Actor network used by the MADDPG agent.  It takes states as input
     and produces an action vector as output.
     """
     def __init__(self, state_dim, action_dim):
